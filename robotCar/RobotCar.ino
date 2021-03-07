@@ -1,4 +1,3 @@
-//www.elegoo.com
 
 #include <Servo.h>  //servo library
 Servo myservo;      // create servo object to control servo
@@ -15,11 +14,15 @@ int Trig = A5;
 #define carSpeed 250
 #define carturnSpeed 150
 int rightDistance = 0, leftDistance = 0, middleDistance = 0;
-float sensor_speed = 50;
+float sensor_delay = 50;
 int sensor_step = 20;
 int distance = 0;
 int sensor_distance = 50;
 int sensor_angle = 70;
+float reverse_sensor_ratio = 0.45;
+float forward_sensor_ratio = 1.75;
+int reverse_time_forward = 300;
+int reverse_time_side = 350;
 
 
 void forward(){ 
@@ -96,88 +99,60 @@ void setup() {
 }
 
 
-float scan(int sensor_pos, float min_distance){
-    myservo.write(sensor_pos);
-    delay(sensor_speed);
-    distance = Distance_test();
-    if (distance < min_distance){
-        min_distance = distance;
-    }
-    return min_distance;
-}
-
-void dir(){
-    stop();
-    myservo.write(90);
+int check_reverse(int sensor_dir, int back_time){
+    myservo.write(sensor_dir);
     delay(360);
-    int distance_middle = Distance_test();
-    if (distance_middle < (sensor_distance/1.5)){
+    int distance = Distance_test();
+    if (distance < (sensor_distance * reverse_sensor_ratio)){
         back();
-        delay(420);
+        delay(back_time);
         stop();
     }
-    
-    myservo.write(0);
-    delay(360);
-    int distance_right = Distance_test();
-    if (distance_right < (sensor_distance/1.5)){
-      back();
-      delay(600);
-      stop();
-    }
+    return distance;
+}
 
-    myservo.write(180);
-    delay(360);
-    int distance_left = Distance_test();
-    if (distance_left < (sensor_distance/1.5)){
-      back();
-      delay(600);
-      stop();
+
+void turn(int turn_time, void (*direction)()){
+    for ( ; ; ){
+        direction();
+        delay(turn_time);
+        int distance_mid = Distance_test();
+        if (distance_mid > sensor_distance * forward_sensor_ratio){
+            break; 
+        }
     }
+}
+
+void choose_dir(){
+    stop();
+    check_reverse(90, reverse_time_forward);
+
+    int distance_right = check_reverse(0, reverse_time_side);
+    int distance_left = check_reverse(180, reverse_time_side);
+
     myservo.write(90);
     delay(360);
     int turn_time = 35;
     if(distance_right > distance_left) {
-        while(1==1){
-          right();
-          delay(turn_time);
-          myservo.write(90);
-          int distance_mid = Distance_test();
-          if (distance_mid > sensor_distance*2){
-            break;
-          
-          }
-        }
-        
-        //right();
-        //delay(100);
+        turn(turn_time, &right);
     }
     else if(distance_right < distance_left) {
-      while(1==1){
-          left();
-          delay(turn_time);
-          myservo.write(90);
-          int distance_mid = Distance_test();
-          if (distance_mid > sensor_distance*2){
-            break;
-          
-          }
-        }
-        //left();
-        //delay(100);
+        turn(turn_time, &left);
     }
     else{
-      while(1==1){
-          left();
-          delay(turn_time);
-          myservo.write(90);
-          int distance_mid = Distance_test();
-          if (distance_mid > sensor_distance*2){
-            break;
-          
-          }
-        }
-      
+        turn(turn_time, &left);
+    }
+}
+
+void scan(int sensor_pos){
+    myservo.write(sensor_pos);
+    delay(sensor_delay);
+    distance = Distance_test();
+    if (distance <= sensor_distance){
+      choose_dir();
+    }
+    else{
+      forward();
     }
 }
 
@@ -185,26 +160,10 @@ void dir(){
 void loop() {
     int sensor_pos;
     for (sensor_pos=90-sensor_angle; sensor_pos < 90+sensor_angle; sensor_pos+=sensor_step){  
-      myservo.write(sensor_pos);
-      delay(sensor_speed);
-      distance = Distance_test();
-      if (distance <= sensor_distance){
-        dir();
-      }
-      else{
-        forward();
-      }
+      scan(sensor_pos);
     }
     for (sensor_pos=90+sensor_angle; sensor_pos > 90-sensor_angle; sensor_pos-=sensor_step){ 
-      myservo.write(sensor_pos);
-      delay(sensor_speed);
-      distance = Distance_test();
-      if (distance <= sensor_distance){
-        dir();
-      }
-      else{
-        forward();
-      }
+     scan(sensor_pos);
     }
 
 }
